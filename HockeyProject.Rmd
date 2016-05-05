@@ -623,7 +623,7 @@ pc2 <- data.frame(pca2$rotation, name = Goalie)
 ggplot(pc2, aes(PC1, PC2)) + geom_point() + geom_text_repel(aes(label=name), size = 3)
 ```
 
-#Applications of Goalie Analytics on the NHL 2015-2016 Playoffs
+##Applications of Goalie Analytics on the NHL 2015-2016 Playoffs
 
 In the first round of the NHL playoffs, several teams struggled with deciding which goalie should they play. Pittsburgh Penguins (PIT), Philadelphia Flyers (PHI), Dallas Stars (DAL). Below is the list of goaltenders.
 
@@ -635,7 +635,7 @@ Hockey analysts typically favour goaltenders with more "experience" to play in t
 
 The Dallas Stars have two goalies who are very similar in experience and ranked in the lower half according to analytics. They have both struggled.
 
-#Pitfalls and Future Prospects
+##Pitfalls and Future Prospects
 
 When it comes to goaltender performance, consistency is a major factor. As elite atheletes in the NHL, all goaltenders are capable of putting up great statistics, the difference is in who is able to do so on a consistent basis. This analytics project is weak in that it only considers the statistics for a single season. Therefore it discounts the value of analytics in helping teams trade or target a goalie to acquire.
 
