@@ -11,7 +11,7 @@ The purpose of this project is to assist NHL pro scouts in identifying goalies w
 
 The application of this work is immediate in the NHL playoffs that's currently underway. We can use analytics to help teams determine which goalies should start in goal. The recommendations from this analysis would have helped all three teams who have played more than one goaltender in this playoff series.
 
-Note: Due to the time it takes for data-scraping (roughly 10 hours), it is recommended to load the .RData files. The final dataset used in the analysis can be found here in .csv format: https://dl.dropboxusercontent.com/u/105063416/nhl_shots_2016.csv
+Note: Due to the time it takes for data-scraping (roughly 10 hours), it is recommended to load the .RData files. The final dataset used in the analysis can be found here in .csv format: https://github.com/piperwolli/FinalProject_HockeyAnalytics/blob/master/nhl_shots_2016.csv
 
 #Background and Motivation
 The National Hockey League is evolving. The league introduced a hard salary cap in 2005. This effectively took away the advantage of financially resourceful franchises to attract the top players with large contracts. In 2005, the inaugural year of the cap system, each team was allowed to spend maximum $39 million with no more than 20% paid out to a single player. It's been a decade since the cap was introduced, yet most teams are still struggling with optimizing a competitive roster.
@@ -54,7 +54,9 @@ $$E[GoalsAllowed] = \sum_{i=1}^{p}\left(P(Goals)_p\right)$$
 #Data Scraping
 This is 50% of the work. The NHL keeps a record of all play-by-play data for each game on its website. Game 0001 of the season played between the Toronto Maple Leafs and the Montreal Canadiens is found in a table here: http://www.nhl.com/scores/htmlreports/20152016/PL020001.HTM
 
-This block of code below scrapes the data we need for this analysis. It takes roughly 10 hours to execute, that's why "eval" is set to FALSE in this RMarkdown File.
+This block of code below scrapes the data we need for this analysis. The data is already in tabular form, so we used XML to capture the information. The data, however, is extremely messy as there are hundres of "hidden tables" built into the web page. More explanations can be found in the comments within the code.
+
+Note: it takes roughly 10 hours to execute this script, that's why "eval" is set to FALSE in this RMarkdown File.
 
 
 ```{r message=FALSE, warning=FALSE, eval=FALSE}
@@ -71,16 +73,20 @@ gamenum <- c(20001:21230)
 ## There are 1230 regular season games played each season
 
 MasterPBP <- c()
+## Create empty list to store future data
+
 gameid <- 0
+## Starting at game 1
 
 for (n in gamelink){
   gameid <- gameid + 1
-  print(paste(n,Sys.time()))
+  print(paste(n,Sys.time())) ## Keeps track of where we are in the process of data scraping (1230 = finish)
   gamedata_p <- readHTMLTable(n,stringsAsFactors=F, as.data.frame=TRUE)
   
   tabs <- c()
   
-  for (i in 1:length(gamedata_p)){
+  ## There are hidden tables, so we are only interested in tables that are of certain size
+  for (i in 1:length(gamedata_p)){ 
     size <- nrow(gamedata_p[[i]])
     
     if (!is.null(size)){
@@ -89,12 +95,13 @@ for (n in gamelink){
       }
     }
   }
-  
+
   gamedata <- c()
   for (p in tabs){
     gamedata<-rbind(gamedata,gamedata_p[[p]] %>% select(1:8))
   }
   
+  ## There are exceptions on a few pages, after clearing all the exception cases, these are the final conditions needed
   g <- gamedata %>% filter(!is.na(V6) & V6!="" & V1 != "#") %>% 
                     mutate(GameID = gameid) %>%
                     select(GameID, 1:8)
@@ -114,7 +121,7 @@ for (n in gamelink){
 ```
 
 Instead of spending 10 hours scraping data, you can load the data directly here: MasterPBP2016.RData
-(https://dl.dropboxusercontent.com/u/105063416/MasterPBP2016.RData)
+(https://github.com/piperwolli/FinalProject_HockeyAnalytics/blob/master/MasterPBP2016.RData)
 
 The play-by-play data contains every event in the game. We can wrangle this data to identify the type of shot, the distance, and other situational information relating to the game. However, before we can do that, we need to identify the Shooter and the Goalie in every shot. Unfortunately the play-by-play data only gives us players' and goalies' jersey number. So we have to look up the players' names in order to properly identify players. Since players may change their jersey number, be traded, acquired, or promoted from the minor leagues, we don't have a straightforward way of doing this. We need to obtain a database that has the roster information for each game. 
 
@@ -175,7 +182,7 @@ names(master_roster) <- c("GameID","Team","Side","Num","Pos","Player")
 ```
 
 Again, this file can be loaded here: MasterRoster2016.RData
-(https://dl.dropboxusercontent.com/u/105063416/MasterRoster2016.RData)
+(https://github.com/piperwolli/FinalProject_HockeyAnalytics/blob/master/MasterRoster2016.RData)
 
 #Data Wrangling
 The raw data we collected earlier isn't very insightful. Although it has all the information, it's not organized in a manner for us to perform analytics. Here is what play-by-play data looks like.
@@ -187,7 +194,7 @@ import <- function(f)        ## This function allows R to load the objects we sa
   nm <- load(f, env)[1]
   return(env[[nm]])
 }
-setwd("C:\\Users\\WhiteWhale\\Dropbox\\CSCI-107\\Hockey Project")
+setwd("C:\\Users\\WhiteWhale\\Dropbox\\CSCI-107\\Hockey Project\\FinalProject_HockeyAnalytics")
 MasterPBP <- import("MasterPBP2016.RData")
 
 MasterPBP <- head(MasterPBP)
@@ -376,6 +383,8 @@ As expected, it is much more difficult for a defense man to score compared to a 
 These two tables below summarize the how period and power play affect scoring:
 
 ```{r message=FALSE, warning=FALSE}
+
+## Segment by period ###
 mlshots %>% group_by(Prd) %>% 
   summarize(Shots = n(), 
             Misses = sum(Event=="MISS"), 
@@ -383,6 +392,7 @@ mlshots %>% group_by(Prd) %>%
             A = (Shots-Misses)/Shots, 
             GP = Goals/(Shots-Misses))
 
+## Segment by Power Play ##
 mlshots %>% group_by(PP) %>% 
             summarize(Shots = n(), 
                       Misses = sum(Event=="MISS"), 
@@ -395,6 +405,7 @@ mlshots %>% group_by(PP) %>%
 
 We can also look at whether homeice advantage is truly an advantage.
 ```{r message=FALSE, warning=FALSE}
+## Segment by Home vs. Visitors ##
 mlshots %>% group_by(Side) %>% 
             summarize(Shots = n(), 
                       Misses = sum(Event=="MISS"), 
@@ -411,7 +422,7 @@ Of the top 10, Toronto and Boston are the ONLY teams who missed the playoffs thi
 
 
 ```{r message=FALSE, warning=FALSE}
-
+## Find the relationship between shots attempted and goals scored for each team ##
 ts <- mlshots %>% group_by(Team) %>% 
                   summarize(Shots = n(), 
                             Misses = sum(Event=="MISS"), 
@@ -426,6 +437,7 @@ ggplot(ts, aes(Shots,Goals,label=Team)) + geom_point() + geom_text(nudge_y = -1.
 Looking at some of the other metrics, distance appears to have a large effect on goal scoring. The series at the top indicate shooting accuracy, the two lines below are probabilities of scoring. Interestingly, there appears to be a slight increase in shot accuracy around the 30~40ft mark. This is likely the result of an open lane to the net just above the face-off circle.
 
 ```{r message=FALSE, warning=FALSE}
+## Find the relationship between shots and distances during power play and full strength ##
 distg <- mlshots %>% group_by(Dist, PP) %>% 
                      summarize(Shots = n(), 
                                Misses = sum(Event=="MISS"), 
@@ -446,6 +458,7 @@ ggplot(distg %>% filter(PP != "SH"), aes(Dist)) +
 We can also look at how goals are distributed amongst the players. Most of the data fall into a normal distribution. However, there are certain tipping points that separate the elite players from the "average" players (as well as under-performing players)
 
 ```{r message=FALSE, warning=FALSE}
+## Individual Player Shooting Data ##
 psa <- mlshots %>% group_by(Shooter, Pos2, Team) %>% 
                    summarize(Shots = n(), 
                    Misses = sum(Event=="MISS"), 
@@ -456,7 +469,7 @@ psa <- mlshots %>% group_by(Shooter, Pos2, Team) %>%
 hist(log(psa$GP,10), breaks = 20)
 qqnorm(psa$GP)
 
-### We set the minimum probability of scoring as 1%, this will be used later
+### We set the minimum probability of scoring as 1%, this will be used later in the Advanced Model
 psa$GP[is.na(psa$GP)] <- 0.01
 s_adj <- sd(psa$GP)
 ```
@@ -545,6 +558,7 @@ sqrt(sum(res1f$Diff**2))
 We can rearrange the results table from above to calculate vital statistics for goaltenders. Shots is the number of shots the goalie faced in regular season, EG is the expected goals the goalie would allow according the model, GA is the actual goals allowed by the goalie, and Diff is the percentage difference between expectation and actual. A negative Diff indicates the goaltender allowed fewer goals than expected - which ranks the goalie higher.
 
 ```{r message=FALSE, warning=FALSE}
+## Getting goalie rank list ###
 res1g <- res1 %>% group_by(Goalie) %>%
                  summarize(Shots = n(), EG = sum(.fitted), GA = sum(Res), Diff = ((GA-EG)/(EG))) %>%
                  filter(Shots > 100) %>%
@@ -553,6 +567,7 @@ res1g <- res1 %>% group_by(Goalie) %>%
 res1g %>% kable(format = "html", pad = 5)
 
 ```
+
 
 A few players near the top of the list may be hidden gems and will require further attention from the scouts. Players such as CALVIN PICKARD and JOONAS KORPISALO who played on very poor teams this season (Colorado Avalanche and Columbus Blue Jackets respectively) do not appear on the first page of a hockey statistics table.
 
@@ -620,10 +635,11 @@ Hockey analysts typically favour goaltenders with more "experience" to play in t
 
 The Dallas Stars have two goalies who are very similar in experience and ranked in the lower half according to analytics. They have both struggled.
 
-#Pitfalls and prospects
+#Pitfalls and Future Prospects
+
 When it comes to goaltender performance, consistency is a major factor. As elite atheletes in the NHL, all goaltenders are capable of putting up great statistics, the difference is in who is able to do so on a consistent basis. This analytics project is weak in that it only considers the statistics for a single season. Therefore it discounts the value of analytics in helping teams trade or target a goalie to acquire.
 
-...and that is why this model has tremendous value in the world of fantasy sports - a once popular office hobby that turned into a billion dollar industry - where rosters are adjusted weekly to take advantage of players' streaks.
+...and that is why this model has tremendous value in the world of fantasy sports - a once popular office hobby that turned into a billion dollar industry - where rosters are adjusted weekly to take advantage of players' streaks. The work is far from complete, future analysis will include line-combination and team match-ups with Monte Carlo simulation.
 
 We will soon be launching a for-profit website dedicated to fantasy sports analytics.
 
